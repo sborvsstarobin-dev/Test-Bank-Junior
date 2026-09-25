@@ -1,10 +1,9 @@
 import requests
-
+from src.main.api.configs.config import Config
 from src.main.api.models.auth_login_request import AuthLoginRequest
 from src.main.api.models.auth_login_response import AuthLoginResponse
 
 class RequestSpecs:
-    BASE_URL = 'http://localhost:4111/api'
     @staticmethod
     def base_headers():
         return {
@@ -30,7 +29,14 @@ class RequestSpecs:
 
             return {
                 'headers': headers,
-                "base_url": RequestSpecs.BASE_URL,
+                "base_url": Config.fetch("backendUrl"),
             }
 
         raise Exception("Failed to authorization")
+
+    @staticmethod
+    def no_auth_headers():
+        return {
+            "headers": RequestSpecs.base_headers(),
+            "base_url": Config.fetch("backendUrl"),
+        }

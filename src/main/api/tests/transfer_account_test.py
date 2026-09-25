@@ -1,247 +1,142 @@
 import pytest
-import requests
+from src.main.api.models.create_user_request import CreateUserRequest
+from src.main.api.models.deposit_account_request import DepositAccountRequest
+from src.main.api.models.transfer_account_request import TransferAccountRequest
+from src.main.api.requests.create_user_requester import CreateUserRequester
+from src.main.api.requests.deposit_account_requester import DepositAccountRequester
+from src.main.api.requests.login_account_requester import CreateAccountRequester
+from src.main.api.requests.transfer_account_requester import TransferAccountRequester
+from src.main.api.specs.request_specs import RequestSpecs
+from src.main.api.specs.response_specs import ResponseSpecs
 
 @pytest.mark.api
 class TestTransferAccount:
+    # Позитивный сценарий перевода счёта - ОР 200
     def test_transfer_account_valid(self):
         # Позитивный кейс авторизации ADMIN - ОР 200
-        auth_admin_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "admin",
-                "password": "123456"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_admin_response.status_code == 200
-        assert auth_admin_response.json()["user"]["username"] == "admin"
-        assert auth_admin_response.json()["user"]["role"] == "ROLE_ADMIN"
 
-        token = auth_admin_response.json().get("token")
+        # Позитивный сценарий создания User - ОР 200
+        create_user_request = CreateUserRequest(username="Max551", password="Pas!sw0rd", role="ROLE_USER")
 
+        c_u_response = CreateUserRequester(
+            request_spec=RequestSpecs.auth_headers(username="admin", password="123456"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(create_user_request)
 
-        # Позитивный сценарий создания USER - ОР 200
-        create_user_response = requests.post(
-            url = "http://localhost:4111/api/admin/create",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd",
-                "role": "ROLE_USER"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "*/*",
-                "Authorization": f"Bearer {token}"
-            }
-        )
-        assert create_user_response.status_code == 200
-        assert create_user_response.json().get("username") == "Max1400"
-        assert create_user_response.json().get("role") == "ROLE_USER"
+        assert create_user_request.username == c_u_response.username
+        assert create_user_request.role == c_u_response.role
 
-        # Позитивный кейс авторизации USER - ОР 200
-        auth_user_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_user_response.status_code == 200
-        assert auth_user_response.json()["user"]["username"] == "Max1400"
-        assert auth_user_response.json()["user"]["role"] == "ROLE_USER"
-
-        token_user = auth_user_response.json().get("token")
+        # Использование Requester для создания счёта
 
         # Позитивный сценарий создания ACCOUNT  №1 - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max551", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        id_1 = create_account_response.json().get("id")
+        # Проверка баланса
+        assert account_response.balance == 0
 
-        # Позитивный сценарий пополнения счета - ОР 200
-        deposit_account_response = requests.post(
-            url = "http://localhost:4111/api/account/deposit",
-            json = {
-                "accountId": id_1,
-                "amount": 1000
-            },
-            headers = {
-                "Accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert deposit_account_response.status_code == 200
-        assert deposit_account_response.json().get("balance") == 1000
-        assert deposit_account_response.json().get("id") == id_1
+        # Сохраняем id из тела ответа созданного счёта
+        id_account_1 = account_response.id
 
         # Позитивный сценарий создания ACCOUNT  №2 - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max551", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        id_2 = create_account_response.json().get("id")
+        # Проверка баланса
+        assert account_response.balance == 0
+
+        # Сохраняем id из тела ответа созданного счёта
+        id_account_2 = account_response.id
+
+        # Позитивный сценарий пополнения счета - ОР 200
+        deposit_account_request = DepositAccountRequest(accountId=id_account_1, amount="4000.5")
+
+        deposit_account_response = DepositAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max551", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(deposit_account_request)
+
+        # Проверка счёта на балансе
+        assert deposit_account_response.balance == 4000.5
 
         # Позитивный сценарий перевода - ОР 200
-        transfer_account_response = requests.post(
-            url = "http://localhost:4111/api/account/transfer",
-            json = {
-                "fromAccountId": id_1,
-                "toAccountId": id_2,
-                "amount": 600
-            },
-            headers = {
-                "accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
+        transfer_account_request = TransferAccountRequest(fromAccountId=id_account_1, toAccountId=id_account_2, amount="570.5")
 
-        assert transfer_account_response.status_code == 200
-        assert transfer_account_response.json().get("fromAccountId") == id_1
-        assert transfer_account_response.json().get("toAccountId") == id_2
-        assert transfer_account_response.json().get("fromAccountIdBalance") == 400
+        transfer_account_response = TransferAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max551", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(transfer_account_request)
+
+        assert transfer_account_response.toAccountId == id_account_2
+        assert transfer_account_response.fromAccountId == id_account_1
 
 
+    # Негативный сценарий перевода счёта - ОР 401(Пользователь не авторизован)
     def test_transfer_account_invalid_401(self):
         # Позитивный кейс авторизации ADMIN - ОР 200
-        auth_admin_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "admin",
-                "password": "123456"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_admin_response.status_code == 200
-        assert auth_admin_response.json()["user"]["username"] == "admin"
-        assert auth_admin_response.json()["user"]["role"] == "ROLE_ADMIN"
 
-        token = auth_admin_response.json().get("token")
+        # Позитивный сценарий создания User - ОР 200
+        create_user_request = CreateUserRequest(username="Max153", password="Pas!sw0rd", role="ROLE_USER")
 
+        c_u_response = CreateUserRequester(
+            request_spec=RequestSpecs.auth_headers(username="admin", password="123456"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(create_user_request)
 
-        # Позитивный сценарий создания USER - ОР 200
-        create_user_response = requests.post(
-            url = "http://localhost:4111/api/admin/create",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd",
-                "role": "ROLE_USER"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "*/*",
-                "Authorization": f"Bearer {token}"
-            }
-        )
-        assert create_user_response.status_code == 200
-        assert create_user_response.json().get("username") == "Max1400"
-        assert create_user_response.json().get("role") == "ROLE_USER"
+        assert create_user_request.username == c_u_response.username
+        assert create_user_request.role == c_u_response.role
 
-        # Позитивный кейс авторизации USER - ОР 200
-        auth_user_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_user_response.status_code == 200
-        assert auth_user_response.json()["user"]["username"] == "Max1400"
-        assert auth_user_response.json()["user"]["role"] == "ROLE_USER"
-
-        token_user = auth_user_response.json().get("token")
+        # Использование Requester для создания счёта
 
         # Позитивный сценарий создания ACCOUNT  №1 - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max153", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        id_1 = create_account_response.json().get("id")
+        # Проверка баланса
+        assert account_response.balance == 0
 
-        # Позитивный сценарий пополнения счета - ОР 200
-        deposit_account_response = requests.post(
-            url = "http://localhost:4111/api/account/deposit",
-            json = {
-                "accountId": id_1,
-                "amount": 1000
-            },
-            headers = {
-                "Accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert deposit_account_response.status_code == 200
-        assert deposit_account_response.json().get("balance") == 1000
-        assert deposit_account_response.json().get("id") == id_1
+        # Сохраняем id из тела ответа созданного счёта
+        id_account_1 = account_response.id
 
         # Позитивный сценарий создания ACCOUNT  №2 - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max153", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        id_2 = create_account_response.json().get("id")
+        # Проверка баланса
+        assert account_response.balance == 0
 
-        # Негативный сценарий сценарий перевода - ОР 401
-        transfer_account_response = requests.post(
-            url = "http://localhost:4111/api/account/transfer",
-            json = {
-                "fromAccountId": id_1,
-                "toAccountId": id_2,
-                "amount": 600
-            },
-            headers = {
-                "accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer "
-            }
-        )
+        # Сохраняем id из тела ответа созданного счёта
+        id_account_2 = account_response.id
 
-        assert transfer_account_response.status_code == 401
+        # Позитивный сценарий пополнения счета - ОР 200
+        deposit_account_request = DepositAccountRequest(accountId=id_account_1, amount="4000.5")
+
+        deposit_account_response = DepositAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max153", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(deposit_account_request)
+
+        # Проверка счёта на балансе
+        assert deposit_account_response.balance == 4000.5
+
+        # Негативный сценарий перевода - ОР 401
+        transfer_account_request = TransferAccountRequest(fromAccountId=id_account_1, toAccountId=id_account_2, amount="570.5")
+
+        transfer_account_response = TransferAccountRequester(
+            request_spec=RequestSpecs.no_auth_headers(),
+            response_spec=ResponseSpecs.status_code_401(),
+        ).post(transfer_account_request)
+
+
+
 
 
 

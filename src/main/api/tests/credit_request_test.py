@@ -1,203 +1,97 @@
 import pytest
-import requests
+from src.main.api.models.create_user_request import CreateUserRequest
+from src.main.api.models.credit_request_request import CreditRequestRequest
+from src.main.api.requests.create_user_requester import CreateUserRequester
+from src.main.api.requests.credit_request_requester import CreditRequestRequester
+from src.main.api.requests.login_account_requester import CreateAccountRequester
+from src.main.api.specs.request_specs import RequestSpecs
+from src.main.api.specs.response_specs import ResponseSpecs
 
 @pytest.mark.api
 class TestCreditRequest:
+    # Позитивный сценарий получения кредита - ОР 201
     def test_credit_request_valid(self):
         # Позитивный кейс авторизации ADMIN - ОР 200
-        auth_admin_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "admin",
-                "password": "123456"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_admin_response.status_code == 200
-        assert auth_admin_response.json()["user"]["username"] == "admin"
-        assert auth_admin_response.json()["user"]["role"] == "ROLE_ADMIN"
 
-        token = auth_admin_response.json().get("token")
+        # Позитивный сценарий создания User - ОР 200
+        create_user_request = CreateUserRequest(username="Max34", password="Pas!sw0rd", role="ROLE_CREDIT_SECRET")
 
+        c_u_response = CreateUserRequester(
+            request_spec=RequestSpecs.auth_headers(username="admin", password="123456"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(create_user_request)
 
-        # Позитивный сценарий создания USER - ОР 200
-        create_user_response = requests.post(
-            url = "http://localhost:4111/api/admin/create",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd",
-                "role": "ROLE_CREDIT_SECRET"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "*/*",
-                "Authorization": f"Bearer {token}"
-            }
-        )
-        assert create_user_response.status_code == 200
-        assert create_user_response.json().get("username") == "Max1400"
-        assert create_user_response.json().get("role") == "ROLE_CREDIT_SECRET"
+        assert create_user_request.username == c_u_response.username
+        assert create_user_request.role == c_u_response.role
 
-        # Позитивный кейс авторизации USER - ОР 200
-        auth_user_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_user_response.status_code == 200
-        assert auth_user_response.json()["user"]["username"] == "Max1400"
-        assert auth_user_response.json()["user"]["role"] == "ROLE_CREDIT_SECRET"
+        # Использование Requester для создания счёта
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max34", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        token_user = auth_user_response.json().get("token")
+        assert account_response.balance == 0
 
-        # Позитивный сценарий создания ACCOUNT - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
-
-        id_account = create_account_response.json().get("id")
+        # Сохраняем id из тела ответа созданного счёта
+        id_account = account_response.id
 
         # Позитивный сценарий получения кредита - ОР 201
-        credit_request_response = requests.post(
-            url = "http://localhost:4111/api/credit/request",
-            json = {
-                "accountId": id_account,
-                "amount": 5000,
-                "termMonths": 12
-            },
-            headers = {
-                "Accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert credit_request_response.status_code == 201
-        assert credit_request_response.json().get("amount") == 5000
-        assert credit_request_response.json().get("termMonths") == 12
+        credit_request_request = CreditRequestRequest(accountId = id_account, amount = 5000, termMonths = 12)
+
+        credit_request_response = CreditRequestRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max34", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post(credit_request_request)
+
+        assert credit_request_response.balance == 5000
+        assert credit_request_request.termMonths == credit_request_response.termMonths
+        assert credit_request_request.amount == credit_request_response.amount
 
 
-    def test_credit_request_invalid_401(self):
+
+
+    # Негативный сценарий получения кредита - ОР 404
+    def test_credit_request_invalid_404(self):
         # Позитивный кейс авторизации ADMIN - ОР 200
-        auth_admin_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "admin",
-                "password": "123456"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_admin_response.status_code == 200
-        assert auth_admin_response.json()["user"]["username"] == "admin"
-        assert auth_admin_response.json()["user"]["role"] == "ROLE_ADMIN"
 
-        token = auth_admin_response.json().get("token")
+        # Позитивный сценарий создания User - ОР 200
+        create_user_request = CreateUserRequest(username="Max247", password="Pas!sw0rd", role="ROLE_CREDIT_SECRET")
 
+        c_u_response = CreateUserRequester(
+            request_spec=RequestSpecs.auth_headers(username="admin", password="123456"),
+            response_spec=ResponseSpecs.status_code_200(),
+        ).post(create_user_request)
 
-        # Позитивный сценарий создания USER - ОР 200
-        create_user_response = requests.post(
-            url = "http://localhost:4111/api/admin/create",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd",
-                "role": "ROLE_CREDIT_SECRET"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "*/*",
-                "Authorization": f"Bearer {token}"
-            }
-        )
-        assert create_user_response.status_code == 200
-        assert create_user_response.json().get("username") == "Max1400"
-        assert create_user_response.json().get("role") == "ROLE_CREDIT_SECRET"
+        assert create_user_request.username == c_u_response.username
+        assert create_user_request.role == c_u_response.role
 
-        # Позитивный кейс авторизации USER - ОР 200
-        auth_user_response = requests.post(
-            url = "http://localhost:4111/api/auth/token/login",
-            json = {
-                "username": "Max1400",
-                "password": "Pas!sw0rd"
-            },
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        )
-        # Проверка на статус код
-        assert auth_user_response.status_code == 200
-        assert auth_user_response.json()["user"]["username"] == "Max1400"
-        assert auth_user_response.json()["user"]["role"] == "ROLE_CREDIT_SECRET"
+        # Использование Requester для создания счёта
+        account_response = CreateAccountRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max247", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post()
 
-        token_user = auth_user_response.json().get("token")
+        assert account_response.balance == 0
 
-        # Позитивный сценарий создания ACCOUNT - ОР 201
-        create_account_response = requests.post(
-            url = "http://localhost:4111/api/account/create",
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert create_account_response.status_code == 201
-        assert create_account_response.json().get("balance") == 0
-
-        id_account = create_account_response.json().get("id")
+        # Сохраняем id из тела ответа созданного счёта
+        id_account = account_response.id
 
         # Позитивный сценарий получения кредита - ОР 201
-        credit_request_response = requests.post(
-            url = "http://localhost:4111/api/credit/request",
-            json = {
-                "accountId": id_account,
-                "amount": 5000,
-                "termMonths": 12
-            },
-            headers = {
-                "Accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert credit_request_response.status_code == 201
-        assert credit_request_response.json().get("amount") == 5000
-        assert credit_request_response.json().get("termMonths") == 12
+        credit_request_request = CreditRequestRequest(accountId=id_account, amount=5000, termMonths=12)
+
+        credit_request_response = CreditRequestRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max247", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_201(),
+        ).post(credit_request_request)
 
         # Негативный сценарий получения кредита - ОР 404
-        credit_request_response = requests.post(
-            url = "http://localhost:4111/api/credit/request",
-            json = {
-                "accountId": id_account,
-                "amount": 5000,
-                "termMonths": 12
-            },
-            headers = {
-                "Accept": "application/json",
-                "Content-type": "application/json",
-                "Authorization": f"Bearer {token_user}"
-            }
-        )
-        assert credit_request_response.status_code == 404
-        assert credit_request_response.json().get("error") == "Only one active credit allowed per user"
+        credit_request_request = CreditRequestRequest(accountId=id_account, amount=5000, termMonths=12)
+
+        CreditRequestRequester(
+            request_spec=RequestSpecs.auth_headers(username="Max247", password="Pas!sw0rd"),
+            response_spec=ResponseSpecs.status_code_404(),
+        ).post(credit_request_request)
+
 
 
 
