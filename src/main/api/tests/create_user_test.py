@@ -1,27 +1,22 @@
 import pytest
+from src.main.api.fixtures.api_fixture import api_manager
 from src.main.api.models.create_user_request import CreateUserRequest
-from src.main.api.requests.create_user_requester import CreateUserRequester
-from src.main.api.specs.request_specs import RequestSpecs
-from src.main.api.specs.response_specs import ResponseSpecs
 
 
 @pytest.mark.api
 
 class TestCreateUser:
     # Позитивный сценарий создания User - ОР 200
-    def test_create_user_valid(self):
+    def test_create_user_valid(self, api_manager):
         # Позитивный кейс авторизации ADMIN - ОР 200
 
         # Позитивный сценарий создания User - ОР 200
-        create_user_request = CreateUserRequest(username = "Max140", password = "Pas!sw0rd", role = "ROLE_USER")
+        create_user_request = CreateUserRequest(username = "Max170", password = "Pas!sw0rd", role = "ROLE_USER")
 
-        c_u_response = CreateUserRequester(
-            request_spec = RequestSpecs.auth_headers(username = "admin", password = "123456"),
-            response_spec= ResponseSpecs.status_code_200(),
-        ).post(create_user_request)
+        response = api_manager.admin_steps.create_user(create_user_request)
 
-        assert create_user_request.username == c_u_response.username
-        assert create_user_request.role == c_u_response.role
+        assert create_user_request.username == response.username
+        assert create_user_request.role == response.role
 
 
     @pytest.mark.parametrize(
@@ -41,28 +36,22 @@ class TestCreateUser:
 
 
     # Негативный сценарий создания User - ОР 400
-    def test_create_user_invalid_400(self, username, password):
+    def test_create_user_invalid_400(self, username, password, api_manager):
         # Позитивный кейс авторизации ADMIN - ОР 200
 
         # Негативный сценарий создания User - ОР 400
         create_user_request = CreateUserRequest(username=username, password=password, role="ROLE_USER")
 
-        CreateUserRequester(
-            request_spec=RequestSpecs.auth_headers(username="admin", password="123456"),
-            response_spec=ResponseSpecs.status_code_400(),
-        ).post(create_user_request)
+        api_manager.admin_steps.create_user_invalid_400(create_user_request)
 
 
 
 
 # Негативный сценарий создания User - ОР 401
-    def test_create_user_invalid_401(self):
+    def test_create_user_invalid_401(self, api_manager):
         # Позитивный кейс авторизации ADMIN - ОР 200
 
         # Негативный сценарий создания User - ОР 401
         create_user_request = CreateUserRequest(username = "Max10", password = "Pas!sw0rd", role = "ROLE_USER")
 
-        CreateUserRequester(
-            request_spec=RequestSpecs.no_auth_headers(),
-            response_spec=ResponseSpecs.status_code_401(),
-        ).post(create_user_request)
+        api_manager.admin_steps.create_user_invalid_401(create_user_request)
