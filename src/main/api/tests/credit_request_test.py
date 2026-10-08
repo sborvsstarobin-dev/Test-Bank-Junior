@@ -1,13 +1,16 @@
 import pytest
 from api.classes.api_manager import ApiManager
+from api.fixtures.db_fixture import db_session
 from api.models.create_user_request import CreateUserRequest
 from src.main.api.models.credit_request_request import CreditRequestRequest
+from sqlalchemy.orm import Session
+from src.main.api.db.crud.credit_crud import CreditCrudDb as Credit
 
 
 @pytest.mark.api
 class TestCreditRequest:
     # Позитивный сценарий получения кредита - ОР 201
-    def test_credit_request_valid(self, api_manager: ApiManager, create_user_request_credit):
+    def test_credit_request_valid(self, api_manager: ApiManager, create_user_request_credit, db_session: Session):
         acc = api_manager.user_steps.create_account(create_user_request_credit)
         id_account = acc.id
 
@@ -18,10 +21,15 @@ class TestCreditRequest:
         assert response.amount == credit_request.amount
         assert response.termMonths == credit_request.termMonths
 
-
+        credit_from_db = Credit.get_credit_by_account_id(db_session, id_account)
+        assert credit_from_db.account_id == credit_request.accountId
+        assert credit_from_db.amount == credit_request.amount
+        assert credit_from_db.term_months == credit_request.termMonths
+        assert credit_from_db.balance == -credit_request.amount
 
     # Негативный сценарий получения кредита - ОР 404
-    def test_credit_request_invalid_404(self, api_manager: ApiManager, create_user_request_credit: CreateUserRequest):
+    def test_credit_request_invalid_404(self, api_manager: ApiManager, create_user_request_credit: CreateUserRequest,
+                                        db_session: Session):
         acc = api_manager.user_steps.create_account(create_user_request_credit)
         id_account = acc.id
 
@@ -31,6 +39,5 @@ class TestCreditRequest:
         credit_request_two = CreditRequestRequest(accountId=id_account, amount=5000, termMonths=12)
         api_manager.user_steps.credit_request_invalid_404(credit_request_two, create_user_request_credit)
 
-
-
-
+        credit_from_db = Credit.get_credit_by_account_id_all(db_session, id_account)
+        assert len(credit_from_db) == 1
